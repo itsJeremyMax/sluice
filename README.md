@@ -44,6 +44,57 @@ upstream = "https://api.anthropic.com"
   to   = "anthropic"
 ```
 
+<details>
+<summary><b>What the <code>policy-check</code> service looks like</b></summary>
+
+Any HTTP server can be a step. This is the guardrail named in the config above: about 30 lines of Python that block a request whose body mentions a banned phrase and pass everything else through untouched. Save it as `guardrail.py`, run `python3 guardrail.py`, then start sluice.
+
+```python
+#!/usr/bin/env python3
+"""A minimal guardrail step for sluice. It blocks any request whose body
+mentions a banned phrase and lets everything else through unchanged."""
+import base64, json
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+BANNED = ["password", "api_key"]
+
+class Guardrail(BaseHTTPRequestHandler):
+    def do_POST(self):
+        n = int(self.headers.get("content-length", 0))
+        env = json.loads(self.rfile.read(n))
+
+        # The request body arrives base64-encoded on the envelope. (With
+        # [route.adapter] set, env["llm"] also holds a provider-agnostic parse
+        # of messages, tools, and model you can inspect instead of raw bytes.)
+        body = base64.b64decode(env["request"].get("body_b64") or "")
+        text = body.decode("utf-8", "replace").lower()
+
+        if any(word in text for word in BANNED):
+            blocked = base64.b64encode(b'{"error":"blocked by guardrail"}').decode()
+            directive = {"action": "abort", "response": {
+                "status": 403, "headers": {"content-type": "application/json"},
+                "body_b64": blocked}}
+        else:
+            directive = {"action": "continue", "ops": []}
+
+        out = json.dumps(directive).encode()
+        self.send_response(200)
+        self.send_header("content-type", "application/json")
+        self.send_header("content-length", str(len(out)))
+        self.end_headers()
+        self.wfile.write(out)
+
+    def log_message(self, *_):  # keep stdout quiet
+        pass
+
+if __name__ == "__main__":
+    HTTPServer(("127.0.0.1", 9001), Guardrail).serve_forever()
+```
+
+The gateway POSTs the [envelope](docs/steps-and-directives.md#the-envelope) to this service and reads back a [directive](docs/steps-and-directives.md#the-directive). Answer `continue` to proceed (optionally with edits), or `abort` to block. See [steps and directives](docs/steps-and-directives.md) for the full contract.
+
+</details>
+
 ## Install
 
 Linux and macOS, x86_64 and arm64:
