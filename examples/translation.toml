@@ -1,0 +1,24 @@
+# Cross-provider translation: a client speaks one provider's wire format,
+# the upstream speaks another, and the gateway translates both directions.
+
+[[route]]
+id       = "openai-to-claude"
+upstream = "https://api.anthropic.com"
+
+  # from/to name the source and target wire dialects (config::Translate).
+  # They must differ: translate.from == translate.to is rejected at load
+  # (a translate that doesn't translate is a config error).
+  [route.translate]
+  from = "openai"
+  to   = "anthropic"
+
+  # Pins the target-provider model id the translated request is sent with.
+  # If set, it must resolve in the model registry under `to` (run
+  # `sluice models list` to see what's currently loaded); this one is a
+  # real Anthropic model id in the embedded seed registry.
+  model = "claude-opus-4-1-20250805"
+
+  # Adds a diagnostic header to the response describing translation
+  # fidelity (which fields, if any, had no equivalent on the target
+  # provider and were recorded rather than silently dropped). Default false.
+  report_header = true

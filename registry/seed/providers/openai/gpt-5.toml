@@ -1,0 +1,13 @@
+# Seed values are advisory and may lag; refresh via `sluice models update` (design §9.6).
+#
+# OpenAI serving overlay for GPT-5: inherits context/output limits and
+# modalities from ../../models/gpt-5-base.toml via `base_model`, adds
+# cost/status/tool_call.
+
+base_model = "gpt-5-base"
+status = "stable"
+tool_call = true
+
+[cost]
+input = 1.25
+output = 10.0

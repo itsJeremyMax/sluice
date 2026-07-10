@@ -1,0 +1,29 @@
+# A route with a type = "wasm" step: a sandboxed, wasmtime-compiled guest
+# module invoked over a small ptr/len ABI.
+#
+# config::load::validate compiles the module at load time (the same
+# WasmStep::from_path call the proxy's own module cache uses lazily on the
+# first real request), so a config that passes `sluice check` compiles the
+# identical way at runtime. A path that doesn't exist, or doesn't compile,
+# is rejected right here rather than failing silently on every request.
+#
+# noop-guardrail.wasm, next to this file, is a placeholder module: it only
+# satisfies the ABI (a `memory` export plus `alloc`/`run` exports) and
+# always returns a no-op result. Swap it for a real compiled guest module.
+
+[[route]]
+id       = "claude"
+upstream = "https://api.anthropic.com"
+
+  [[route.step]]
+  name = "wasm-guardrail"
+  type = "wasm"
+  hook = "on_request"   # wasm steps run on on_request or on_response, not on_stream
+
+  # Path is resolved relative to the process's current working directory,
+  # not the config file's location. Run `sluice check`/`sluice serve` from
+  # the repo root, as shown in examples/README.md, so this resolves.
+  wasm = "examples/noop-guardrail.wasm"
+
+  timeout_ms = 500
+  on_error   = "fail_closed"

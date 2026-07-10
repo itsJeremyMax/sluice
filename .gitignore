@@ -1,3 +1,13 @@
+# Build output
 target/
-Cargo.lock
+
+# OS
 .DS_Store
+
+# Runtime artifacts
+/sluice-models.json
+
+# Agent / workflow artifacts (never commit)
+.superpowers/
+docs/superpowers/
+docs/*-pressure-test.md

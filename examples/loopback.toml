@@ -1,0 +1,33 @@
+# Loopback (M12): for a legacy tool that can't return a directive inline.
+# The gateway parks the in-flight chain, calls the tool out of band, and
+# resumes the chain later from a signed callback. EXPERIMENTAL and OFF BY
+# DEFAULT: it only activates once loopback_secret below is non-empty.
+
+[gateway]
+# HMAC secret used to sign/verify the x-chain-token used by mode=loopback
+# steps. Empty (the default) disables loopback outright: any mode=loopback
+# step is rejected at load unless this is set. Use a real secret, not this
+# placeholder, in production.
+loopback_secret = "replace-me-with-a-real-secret"
+
+# Maximum number of loopback hops a single chain may take before the
+# gateway refuses to resume it further. Default shown.
+max_hops = 8
+
+# HTTP path the gateway listens on for loopback resume callbacks. Default
+# shown.
+callback_path = "/__sluice/loopback"
+
+[[route]]
+id       = "claude"
+upstream = "https://api.anthropic.com"
+
+  [[route.step]]
+  name = "external-tool"
+  type = "url"
+  url  = "http://127.0.0.1:9002/dispatch"
+
+  # mode=loopback is url-step-only and is only supported on hook=on_request
+  # (config::load::validate rejects it on on_response/on_stream).
+  mode = "loopback"
+  hook = "on_request"

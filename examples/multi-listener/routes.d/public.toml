@@ -1,0 +1,7 @@
+# <dir>/routes.d/*.toml files contribute [[route]] blocks; they're merged
+# in filename order and route ids must be globally unique across all of
+# them. This file defines the one route the public-facing listener exposes.
+
+[[route]]
+id       = "claude"
+upstream = "https://api.anthropic.com"

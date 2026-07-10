@@ -1,0 +1,9 @@
+# <dir>/gateways.d/<name>.toml defines one named listener (M13). The name
+# is the filename stem ("public"), not a field in the file. Only "listen"
+# and "routes" are read here; there is no wrapping [gateway] table.
+#
+# This listener is the public one: it only exposes the "claude" route, not
+# "internal-tools".
+
+listen = "0.0.0.0:8080"
+routes = ["claude"]

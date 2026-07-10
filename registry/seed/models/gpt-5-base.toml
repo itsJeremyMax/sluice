@@ -1,0 +1,14 @@
+# Seed values are advisory and may lag; refresh via `sluice models update` (design §9.6).
+#
+# Provider-agnostic base facts for OpenAI's GPT-5, shared by any
+# provider-serving entry that inherits via `base_model = "gpt-5-base"`
+# (registry/seed/providers/openai/gpt-5.toml). This file's own id
+# ("gpt-5-base") is never looked up directly — it only exists as an
+# inheritance target, deliberately distinct from the real model id so it
+# can't collide with it in the `base_model` chain.
+
+modalities = ["text", "image"]
+
+[limit]
+context = 400000
+output = 128000

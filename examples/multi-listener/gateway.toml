@@ -1,0 +1,16 @@
+# <dir>/gateway.toml supplies only the [gateway] table for a directory
+# config. It's optional; a missing file just means Gateway::default().
+#
+# Once <dir>/gateways.d/*.toml exists (see gateways.d/ next to this file),
+# `gateway.listen` below is ignored for serving: each named gateway in
+# gateways.d binds its own address instead. It's still validated (e.g.
+# against admin_listen), so leave it as a harmless default rather than
+# deleting it.
+
+[gateway]
+schema_version = 1
+
+# One shared admin listener (/healthz, /readyz, /metrics) for the whole
+# process, regardless of how many gateways.d listeners are defined. It must
+# not collide with any of them (config::load::validate checks this).
+admin_listen = "127.0.0.1:9090"

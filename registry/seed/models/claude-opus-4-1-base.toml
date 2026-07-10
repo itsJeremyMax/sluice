@@ -1,0 +1,14 @@
+# Seed values are advisory and may lag; refresh via `sluice models update` (design §9.6).
+#
+# Provider-agnostic base facts for Anthropic's Claude Opus 4.1, shared by any
+# provider-serving entry that inherits via `base_model = "claude-opus-4-1-base"`
+# (registry/seed/providers/anthropic/claude-opus-4-1-20250805.toml). This
+# file's own id ("claude-opus-4-1-base") is never looked up directly — it
+# only exists as an inheritance target, deliberately distinct from the real
+# model id so it can't collide with it in the `base_model` chain.
+
+modalities = ["text", "image"]
+
+[limit]
+context = 200000
+output = 32000

@@ -1,0 +1,48 @@
+[package]
+name = "sluice"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/itsJeremyMax/sluice"
+description = "A modular, self-hosted gateway that pipes requests through swappable middleware steps."
+
+[lib]
+name = "sluice"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sluice"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "process", "time", "io-util"] }
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio", "server", "server-auto", "http1"] }
+http-body-util = "0.1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+clap = { version = "4", features = ["derive"] }
+bytes = "1"
+arc-swap = "1"
+base64 = "0.22"
+hmac = "0.12"
+sha2 = "0.10"
+dashmap = "6"
+thiserror = "2"
+anyhow = "1"
+futures-util = "0.3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter", "fmt"] }
+metrics = "0.24"
+metrics-exporter-prometheus = { version = "0.16", default-features = false }
+uuid = { version = "1", features = ["v4"] }
+notify = "6"
+include_dir = "0.7"
+wasmtime = "46.0.1"
+subtle = "2"
+
+[dev-dependencies]
+wiremock = "0.6"
+wat = "1"

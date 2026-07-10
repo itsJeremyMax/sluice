@@ -1,0 +1,8 @@
+# A second route, only meant to be reachable from the internal listener
+# (see gateways.d/internal.toml). Nothing about the route itself marks it
+# internal; it's the gateways.d "routes" list that decides which listener
+# exposes which route ids.
+
+[[route]]
+id       = "internal-tools"
+upstream = "http://tools.internal.example:9000"

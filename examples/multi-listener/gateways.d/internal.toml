@@ -1,0 +1,6 @@
+# The internal listener binds a different address (must be unique across
+# gateways.d) and exposes both routes, including "internal-tools", which
+# the public listener above does not carry.
+
+listen = "127.0.0.1:8081"
+routes = ["claude", "internal-tools"]

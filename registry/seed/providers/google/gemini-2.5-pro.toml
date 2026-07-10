@@ -1,0 +1,13 @@
+# Seed values are advisory and may lag; refresh via `sluice models update` (design §9.6).
+#
+# Google serving overlay for Gemini 2.5 Pro: inherits context/output limits
+# and modalities from ../../models/gemini-2.5-pro-base.toml via
+# `base_model`, adds cost/status/tool_call.
+
+base_model = "gemini-2.5-pro-base"
+status = "stable"
+tool_call = true
+
+[cost]
+input = 1.25
+output = 10.0

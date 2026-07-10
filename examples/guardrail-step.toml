@@ -1,0 +1,39 @@
+# A route with an on_request guardrail step, plus a [gateway] block showing
+# the admin listener and a couple of load-survival limits.
+
+[gateway]
+schema_version = 1
+listen         = "127.0.0.1:8080"
+
+# Separate listener for /healthz, /readyz, and /metrics. It must differ from
+# `listen` (config::load::validate rejects the two being equal). Leaving
+# admin_listen empty (the default) disables the admin listener entirely.
+admin_listen = "127.0.0.1:8090"
+
+# Two load-survival limits, both shown at non-default values:
+# - max_inflight sheds load with a 503 once this many requests are in
+#   flight at once, rather than queuing without bound (default 1024).
+# - upstream_timeout_ms bounds how long the gateway waits on the upstream
+#   before giving up (default 60000).
+max_inflight        = 256
+upstream_timeout_ms = 30000
+
+[[route]]
+id       = "claude"
+upstream = "https://api.anthropic.com"
+
+  # A guardrail step: it inspects every request before it reaches the
+  # upstream and can block it. Guardrail steps have tighter validation than
+  # ordinary steps (config::load::validate):
+  # - on hook = on_stream they may not be observe-only (not the case here,
+  #   this one runs on on_request);
+  # - on_error may not be "fail_open" (a guardrail that fails open isn't a
+  #   guardrail), so this must stay "fail_closed".
+  [[route.step]]
+  name        = "policy-check"
+  hook        = "on_request"
+  type        = "url"
+  url         = "http://127.0.0.1:9001/guardrail"
+  is_guardrail = true
+  on_error    = "fail_closed"   # required for is_guardrail steps
+  timeout_ms  = 500              # fail fast rather than hold the request open

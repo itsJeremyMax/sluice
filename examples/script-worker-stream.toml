@@ -1,0 +1,38 @@
+# A streaming route with a long-lived "worker" script step that mutates
+# chunks in place as they stream back from the upstream.
+
+[gateway]
+# Master switch for any type = "script" step. Left false (the default) any
+# type = "script" step is a validation error, not a silent no-op.
+allow_scripts = true
+
+[[route]]
+id       = "claude-stream"
+upstream = "https://api.anthropic.com"
+
+  [[route.step]]
+  name = "redactor"
+  type = "script"
+
+  # A script step only has a per-chunk runtime on hook = on_stream when it
+  # runs as a long-lived worker process the gateway talks to repeatedly
+  # (script_mode = "worker"). The default, "oneshot" (a fresh subprocess per
+  # invocation), has no per-chunk dispatch and is rejected on on_stream at
+  # load time.
+  hook        = "on_stream"
+  script_mode = "worker"
+
+  # A worker step on on_stream is only ever dispatched by the gateway when
+  # chunk_mode = "mutate" (config::load::validate rejects the observe
+  # default here, since an observe-only worker step would load clean but
+  # never actually run).
+  chunk_mode = "mutate"
+
+  # The command (argv) to spawn. "cat" is a bare name with no path
+  # separator, so it is resolved against PATH at spawn time rather than
+  # checked for existence at config load; a real worker would speak the
+  # length-prefixed framing over stdin/stdout instead of just echoing bytes.
+  cmd = ["cat"]
+
+  timeout_ms = 2000
+  on_error   = "fail_open"   # a non-guardrail step may fail open

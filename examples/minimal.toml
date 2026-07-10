@@ -1,0 +1,15 @@
+# Smallest possible sluice config: one route, no steps.
+#
+# A route needs only an id (the first path segment the gateway matches on)
+# and an upstream (where the rest of the path is forwarded to). Every other
+# field, on both [gateway] and [[route]], has a default, so leaving
+# [gateway] out entirely is fine; it listens on 127.0.0.1:8080.
+#
+# With no [[route.step]] blocks, this route is a transparent pass-through:
+# a request to http://127.0.0.1:8080/claude/v1/messages is forwarded as-is
+# to https://api.anthropic.com/v1/messages and the response streams straight
+# back.
+
+[[route]]
+id       = "claude"
+upstream = "https://api.anthropic.com"
