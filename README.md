@@ -8,6 +8,42 @@ agent ──▶ sluice [ on_request ▸ upstream ▸ on_response | on_stream ] �
 
 Your agents keep calling their provider the way they always have. Sluice sits in the path and runs your steps on the request going out and the response coming back. Traffic that is not an LLM call passes straight through as a plain byte pipe, so you pay only for what you turn on.
 
+## A config at a glance
+
+A real `sluice.toml`: proxy Anthropic behind a guardrail, and let OpenAI clients reach Claude through translation. This validates with `sluice check`.
+
+```toml
+[gateway]
+listen              = "127.0.0.1:8080"   # where your agents connect
+admin_listen        = "127.0.0.1:9090"   # /healthz, /readyz, /metrics
+max_inflight        = 512                 # shed load with a 503 past this many concurrent requests
+upstream_timeout_ms = 30000
+
+# Proxy Anthropic, and vet every request with a guardrail first.
+[[route]]
+id       = "claude"
+upstream = "https://api.anthropic.com"
+
+  [route.adapter]
+  ingress = "anthropic"            # parse the body into the provider-agnostic llm view
+
+  [[route.step]]
+  name         = "policy-check"
+  type         = "url"
+  url          = "http://127.0.0.1:9001/guardrail"
+  is_guardrail = true              # must fail closed; the gateway enforces it
+  timeout_ms   = 500
+
+# Let OpenAI clients reach Claude, translated in both directions.
+[[route]]
+id       = "gpt"
+upstream = "https://api.anthropic.com"
+
+  [route.translate]
+  from = "openai"
+  to   = "anthropic"
+```
+
 ## Install
 
 Linux and macOS, x86_64 and arm64:
