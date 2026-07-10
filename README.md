@@ -10,7 +10,7 @@ Your agents keep calling their provider the way they always have. Sluice sits in
 
 ## A config at a glance
 
-A real `sluice.toml`: proxy Anthropic behind a guardrail, and let OpenAI clients reach Claude through translation. This validates with `sluice check`.
+A real `sluice.toml`: proxy Anthropic behind a guardrail, and let OpenAI clients reach Claude through translation. This validates with `sluice check`. Every term in it is defined under [Core concepts](#core-concepts).
 
 ```toml
 [gateway]
@@ -64,6 +64,29 @@ curl -fsSL https://raw.githubusercontent.com/itsJeremyMax/sluice/main/install.sh
 
 Prefer not to pipe to a shell? Grab a prebuilt binary from the [releases page](https://github.com/itsJeremyMax/sluice/releases), or build from source with `cargo build --release` (the binary lands at `target/release/sluice`).
 
+## Core concepts
+
+The vocabulary the rest of this page uses, one line each. Follow the reference for the full treatment.
+
+| Concept | In one line | Details |
+|---|---|---|
+| **Gateway** | The sluice process: the only node that forwards traffic, and it holds every route. Configured in `[gateway]`. | [config](docs/configuration.md) |
+| **Route** | A named upstream, picked by the first path segment of the URL (`/claude/...` selects route `claude`). `[[route]]`. | [config](docs/configuration.md) |
+| **Upstream** | The provider base URL a route forwards to. | [config](docs/configuration.md) |
+| **Step** | A unit of your logic the gateway hands each request to: an HTTP service, a script, or a wasm module. Your code runs here. | [steps](docs/steps-and-directives.md) |
+| **Chain** | The ordered list of steps on a route. Reorder or drop one by editing the file. | [steps](docs/steps-and-directives.md) |
+| **Hook** | When a step runs: `on_request`, `on_response`, or `on_stream`. | [hooks](docs/steps-and-directives.md#the-hooks-in-depth) |
+| **Envelope** | The JSON view of the request (or response, or chunk) the gateway passes to a step. | [envelope](docs/steps-and-directives.md#the-envelope) |
+| **Directive** | The JSON a step returns: `continue` with edits, `short_circuit`, `abort`, or `emit`/`drop` on streams. | [directive](docs/steps-and-directives.md#the-directive) |
+| **Guardrail** | A step marked `is_guardrail = true` that must be able to block. The gateway rejects any config that could let it be bypassed. | [guardrail steps](docs/steps-and-directives.md#guardrail-steps) |
+| **Adapter** | Parses a provider's wire body into the `llm` view. `[route.adapter]`. | [config](docs/configuration.md) |
+| **`llm` view** | The provider-agnostic parse of an LLM call (messages, tools, model, streaming) plus registry facts, so one step works across providers. | [translation](docs/translation.md) |
+| **Translation** | Rewriting a request and response between two providers' wire formats through one canonical shape. `[route.translate]`. | [translation](docs/translation.md) |
+| **Model registry** | The table of per-model facts (context window, advisory pricing, tool support) behind the `llm` view. `sluice models`. | [operations](docs/observability-and-operations.md) |
+| **Loopback** | Parking a chain to call a legacy tool, then resuming it from a signed callback. Off by default. | [operations](docs/observability-and-operations.md) |
+
+Budgets, caches, and cost meters are not built in. You write them as steps that read the `llm` view; translation, the load-survival limits, the registry, and the admin surface are built in.
+
 ## A tour in five configs
 
 Sluice is configured, not coded. Here is the feature set as the TOML that switches each piece on. Start the gateway with `sluice serve --config sluice.toml`; validate any config first with `sluice check`.
@@ -88,7 +111,7 @@ Requests to `http://127.0.0.1:8080/claude/v1/messages` now forward to `https://a
   is_guardrail = true          # a guardrail must fail closed; the gateway enforces it
 ```
 
-The service receives the request as JSON and answers `continue`, `short_circuit`, or `abort`. Because a guardrail cannot be set to fail open, a crash in it blocks the request instead of leaking it through.
+The service receives the request as JSON and answers `continue`, `short_circuit`, or `abort`. Because a [guardrail](docs/steps-and-directives.md#guardrail-steps) cannot be set to fail open, a crash in it blocks the request instead of leaking it through.
 
 **3. Let OpenAI clients talk to Claude.** One block rewrites the request into the target provider's wire format on the way out, and translates the response back on the way in.
 

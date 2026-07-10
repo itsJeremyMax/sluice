@@ -207,6 +207,17 @@ Every step has its own `on_error`, defaulting to `fail_closed`. It governs what 
 
 `is_guardrail = true` steps cannot be configured with `on_error = "fail_open"` (rejected at config load): a guardrail that fails open cannot enforce anything, so the gateway refuses to load that config at all rather than silently defeat the guardrail under load.
 
+## Guardrail steps
+
+A guardrail is any step you declare as safety-critical by setting `is_guardrail = true`. It is what enforces a rule you are not willing to let traffic past: a content policy, a banned-phrase check, a redaction pass, a budget denial. A guardrail is what the gateway will let block a request; a plain step is one you would rather run best-effort.
+
+Functionally a guardrail is an ordinary step. It runs on the same hooks, receives the same [envelope](#the-envelope), and returns the same [directives](#the-directive) as any other step. The flag changes nothing about how the step runs. What it changes is which configurations the gateway will accept around it. Marking a step a guardrail is a promise that it must be able to block, and the gateway enforces that promise at load by rejecting any config that would let the guardrail be silently bypassed:
+
+- It cannot be `on_error = "fail_open"`. A guardrail that waves the request through when it errors or times out is not enforcing anything, so a fail-open guardrail is a config error rather than a runtime surprise.
+- On `hook = "on_stream"` it cannot be `chunk_mode = "observe"`. An observe step is a read-only tee that cannot alter or drop what the client receives, so an observe-only guardrail could enforce nothing on the stream. A stream guardrail must be `chunk_mode = "mutate"`.
+
+The intent is that a guardrail either does its job or fails the request, and never quietly lets traffic past. A step that only tags, meters, or logs does not need the flag; leave `is_guardrail` at its default `false` for those.
+
 ## The three step runtimes
 
 `run_step` dispatches every step, on every hook, to one of three runtimes based on `type`. All three implement the same contract: take an `Envelope`, return a `Directive`, bounded by `timeout_ms`.
