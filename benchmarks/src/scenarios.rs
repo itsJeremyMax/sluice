@@ -204,15 +204,15 @@ fn free_listen_addr() -> String {
     format!("127.0.0.1:{}", l.local_addr().unwrap().port())
 }
 
-/// Block (via short polling sleeps) until `addr` accepts a TCP connection,
-/// or panic after 100 * 20ms = 2s. Plain std blocking is fine here: this
-/// runs once per scenario at harness startup, not on the measured hot path.
-fn wait_until_accepting(addr: SocketAddr) {
+/// Asynchronously wait (via short polling sleeps) until `addr` accepts a TCP
+/// connection, or panic after 100 * 20ms = 2s. Uses tokio primitives to avoid
+/// blocking worker threads in async runtimes.
+async fn wait_until_accepting(addr: SocketAddr) {
     for _ in 0..100 {
-        if std::net::TcpStream::connect(addr).is_ok() {
+        if tokio::net::TcpStream::connect(addr).await.is_ok() {
             return;
         }
-        std::thread::sleep(Duration::from_millis(20));
+        tokio::time::sleep(Duration::from_millis(20)).await;
     }
     panic!("sluice listener at {addr} never started accepting connections");
 }
@@ -220,9 +220,9 @@ fn wait_until_accepting(addr: SocketAddr) {
 /// Launch a fresh in-process sluice instance configured for `scenario`,
 /// proxying onto `upstream`. Writes the scenario's TOML (and, for
 /// `ScriptStep`, its script fixture) to a temp dir, spawns
-/// `sluice::server::serve` on the current tokio runtime, and blocks until
+/// `sluice::server::serve` on the current tokio runtime, and waits until
 /// the listener is accepting before returning its address.
-pub fn start_sluice(
+pub async fn start_sluice(
     scenario: &Scenario,
     upstream: SocketAddr,
     workspace_root: &Path,
@@ -253,7 +253,7 @@ pub fn start_sluice(
     });
 
     let addr: SocketAddr = listen.parse().expect("listen addr");
-    wait_until_accepting(addr);
+    wait_until_accepting(addr).await;
     addr
 }
 
@@ -266,7 +266,7 @@ mod tests {
     async fn passthrough_scenario_round_trips_through_sluice() {
         let up = upstream::start(Sim::default_bench());
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let sluice_addr = start_sluice(&Scenario::Passthrough, up, &root);
+        let sluice_addr = start_sluice(&Scenario::Passthrough, up, &root).await;
         let resp = reqwest::Client::new()
             .post(format!(
                 "http://{sluice_addr}{}",
@@ -285,7 +285,7 @@ mod tests {
     async fn translation_scenario_round_trips_through_sluice() {
         let up = upstream::start(Sim::default_bench());
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let sluice_addr = start_sluice(&Scenario::Translation, up, &root);
+        let sluice_addr = start_sluice(&Scenario::Translation, up, &root).await;
         let resp = reqwest::Client::new()
             .post(format!(
                 "http://{sluice_addr}{}",
@@ -306,7 +306,7 @@ mod tests {
     async fn wasm_step_scenario_round_trips_through_sluice() {
         let up = upstream::start(Sim::default_bench());
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let sluice_addr = start_sluice(&Scenario::WasmStep, up, &root);
+        let sluice_addr = start_sluice(&Scenario::WasmStep, up, &root).await;
         let resp = reqwest::Client::new()
             .post(format!(
                 "http://{sluice_addr}{}",
@@ -323,7 +323,7 @@ mod tests {
     async fn streaming_scenario_round_trips_through_sluice() {
         let up = upstream::start(Sim::default_bench());
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let sluice_addr = start_sluice(&Scenario::Streaming, up, &root);
+        let sluice_addr = start_sluice(&Scenario::Streaming, up, &root).await;
         let body = reqwest::Client::new()
             .post(format!(
                 "http://{sluice_addr}{}",
@@ -345,7 +345,7 @@ mod tests {
         assert!(Scenario::ScriptStep.available());
         let up = upstream::start(Sim::default_bench());
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let sluice_addr = start_sluice(&Scenario::ScriptStep, up, &root);
+        let sluice_addr = start_sluice(&Scenario::ScriptStep, up, &root).await;
         let resp = reqwest::Client::new()
             .post(format!(
                 "http://{sluice_addr}{}",
