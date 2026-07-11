@@ -2171,6 +2171,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sluice-bench"
+version = "0.0.0"
+dependencies = [
+ "futures-util",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sluice",
+ "tokio",
+]
+
+[[package]]
 name = "smallvec"
 version = "1.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

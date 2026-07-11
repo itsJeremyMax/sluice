@@ -47,3 +47,6 @@ self-replace = "1"
 [dev-dependencies]
 wiremock = "0.6"
 wat = "1"
+
+[workspace]
+members = ["benchmarks"]
