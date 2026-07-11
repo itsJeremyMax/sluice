@@ -46,8 +46,9 @@ directive) these configs use.
 
 - **wasm-step.toml**: a `type = "wasm"` step pointing at
   `noop-guardrail.wasm`, a placeholder module in this directory that
-  satisfies the guest ABI (`memory`, `alloc`, `run` exports) but does
-  nothing. Swap it for a real compiled module.
+  satisfies the guest ABI (`memory`, `alloc`, `run` exports) and returns a
+  no-op `{"action":"continue"}` directive. Swap it for a real compiled
+  module.
 
   ```bash
   sluice check --config examples/wasm-step.toml

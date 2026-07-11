@@ -9,7 +9,13 @@
 #
 # noop-guardrail.wasm, next to this file, is a placeholder module: it only
 # satisfies the ABI (a `memory` export plus `alloc`/`run` exports) and
-# always returns a no-op result. Swap it for a real compiled guest module.
+# always returns a no-op `{"action":"continue"}` directive. Swap it for a
+# real compiled guest module.
+#
+# Regenerate this fixture from tests/wasm.rs's
+# `regenerate_noop_guardrail_fixture` (an #[ignore]'d test) if it ever needs
+# rebuilding:
+#   cargo test --test wasm regenerate_noop_guardrail_fixture -- --ignored
 
 [[route]]
 id       = "claude"

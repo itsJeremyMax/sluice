@@ -189,7 +189,7 @@ upstream = "http://{upstream}"
   hook = "on_request"
   wasm = "{wasm}"
   timeout_ms = 2000
-  on_error   = "fail_open"
+  on_error   = "fail_closed"
 "#,
                 wasm = wasm.display(),
             )
