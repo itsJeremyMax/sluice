@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1](https://github.com/itsJeremyMax/sluice/compare/v0.1.0...v0.1.1) (2026-07-11)
+
+
+### Bug Fixes
+
+* deflake worker-eviction test whose marker raced the step timeout ([042ed0c](https://github.com/itsJeremyMax/sluice/commit/042ed0c7584988edd230de8013c528176a22d26b))
+* install.sh cleanup trap, prerelease-gated publishing, changelog artifact ([1ebbea0](https://github.com/itsJeremyMax/sluice/commit/1ebbea036cddafc78dc090bdd4f7c1965c73910f))
+
 ## [0.1.0](https://github.com/itsJeremyMax/sluice/compare/v0.1.0...v0.1.0) (2026-07-11)
 
 
