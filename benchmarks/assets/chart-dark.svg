@@ -11,29 +11,29 @@
 <line x1="670.0" y1="56" x2="670.0" y2="340.0" stroke="#2c2c2a" stroke-width="1"/>
 <text x="670.0" y="354.0" text-anchor="middle" fill="#c3c2b7">30</text>
 <text x="120.0" y="84.0" text-anchor="end" fill="#ffffff">passthrough</text>
-<rect x="130" y="64.0" width="5.0" height="18" rx="2" fill="#3987e5"/>
-<text x="141.0" y="78.0" fill="#c3c2b7">0.28</text>
-<rect x="130" y="86.0" width="11.1" height="18" rx="2" fill="#199e70"/>
-<text x="147.1" y="100.0" fill="#c3c2b7">0.62</text>
+<rect x="130" y="64.0" width="2.9" height="18" rx="2" fill="#3987e5"/>
+<text x="138.9" y="78.0" fill="#c3c2b7">0.16</text>
+<rect x="130" y="86.0" width="6.9" height="18" rx="2" fill="#199e70"/>
+<text x="142.9" y="100.0" fill="#c3c2b7">0.38</text>
 <text x="120.0" y="140.0" text-anchor="end" fill="#ffffff">translation</text>
-<rect x="130" y="120.0" width="5.6" height="18" rx="2" fill="#3987e5"/>
-<text x="141.6" y="134.0" fill="#c3c2b7">0.31</text>
-<rect x="130" y="142.0" width="10.8" height="18" rx="2" fill="#199e70"/>
-<text x="146.8" y="156.0" fill="#c3c2b7">0.60</text>
+<rect x="130" y="120.0" width="3.3" height="18" rx="2" fill="#3987e5"/>
+<text x="139.3" y="134.0" fill="#c3c2b7">0.18</text>
+<rect x="130" y="142.0" width="8.1" height="18" rx="2" fill="#199e70"/>
+<text x="144.1" y="156.0" fill="#c3c2b7">0.45</text>
 <text x="120.0" y="196.0" text-anchor="end" fill="#ffffff">script-step</text>
-<rect x="130" y="176.0" width="210.8" height="18" rx="2" fill="#3987e5"/>
-<text x="346.8" y="190.0" fill="#c3c2b7">11.71</text>
-<rect x="130" y="198.0" width="418.4" height="18" rx="2" fill="#199e70"/>
-<text x="554.4" y="212.0" fill="#c3c2b7">23.25</text>
+<rect x="130" y="176.0" width="234.8" height="18" rx="2" fill="#3987e5"/>
+<text x="370.8" y="190.0" fill="#c3c2b7">13.04</text>
+<rect x="130" y="198.0" width="466.4" height="18" rx="2" fill="#199e70"/>
+<text x="602.4" y="212.0" fill="#c3c2b7">25.91</text>
 <text x="120.0" y="252.0" text-anchor="end" fill="#ffffff">wasm-step</text>
-<rect x="130" y="232.0" width="8.8" height="18" rx="2" fill="#3987e5"/>
-<text x="144.8" y="246.0" fill="#c3c2b7">0.49</text>
-<rect x="130" y="254.0" width="18.0" height="18" rx="2" fill="#199e70"/>
-<text x="154.0" y="268.0" fill="#c3c2b7">1.00</text>
-<text x="120.0" y="308.0" text-anchor="end" fill="#ffffff">streaming</text>
-<rect x="130" y="288.0" width="12.4" height="18" rx="2" fill="#3987e5"/>
-<text x="148.4" y="302.0" fill="#c3c2b7">0.69</text>
-<rect x="130" y="310.0" width="1.0" height="18" rx="2" fill="#199e70"/>
-<text x="137.0" y="324.0" fill="#c3c2b7">-10.28</text>
+<rect x="130" y="232.0" width="5.9" height="18" rx="2" fill="#3987e5"/>
+<text x="141.9" y="246.0" fill="#c3c2b7">0.33</text>
+<rect x="130" y="254.0" width="13.6" height="18" rx="2" fill="#199e70"/>
+<text x="149.6" y="268.0" fill="#c3c2b7">0.76</text>
+<text x="120.0" y="308.0" text-anchor="end" fill="#ffffff">streaming (ttfb)</text>
+<rect x="130" y="288.0" width="1.0" height="18" rx="2" fill="#3987e5"/>
+<text x="137.0" y="302.0" fill="#c3c2b7">-0.54</text>
+<rect x="130" y="310.0" width="2.5" height="18" rx="2" fill="#199e70"/>
+<text x="138.5" y="324.0" fill="#c3c2b7">0.14</text>
 <text x="16" y="372.0" fill="#c3c2b7">macos/aarch64 · 8 cpus · sluice v0.1.0 · 2026-07-11</text>
 </svg>

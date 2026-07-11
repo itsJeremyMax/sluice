@@ -33,13 +33,21 @@ still carry roughly ±1ms of tail noise on a laptop-class machine — a tiny
 or slightly negative added p99 should be read as "no measurable overhead,"
 not as sluice being faster than the bare upstream.
 
+The streaming chart row plots added *time-to-first-byte*, not added total
+stream duration: each streamed request lasts ~48ms dominated by the
+upstream's paced SSE sleeps, so comparing two independently measured
+total-duration percentiles yields multi-ms pacing jitter rather than
+gateway overhead. Total stream duration still appears in
+`results/latest.json` for transparency, but its p99 delta is
+jitter-dominated and not charted.
+
 ## Scenarios
 
 - **passthrough** — plain proxy route, no steps
 - **translation** — openai→anthropic wire translation
 - **script-step** — a oneshot subprocess step in the request chain (unix only)
 - **wasm-step** — a wasmtime guest step in the request chain
-- **streaming** — SSE passthrough; also reports time-to-first-byte
+- **streaming** — SSE passthrough; charted as added time-to-first-byte
 
 Concurrency levels 1 / 8 / 64; nearest-rank percentiles over a 5s window
 after a 2s warmup. Not run in CI — shared-runner numbers are noise.

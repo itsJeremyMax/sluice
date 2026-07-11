@@ -8,7 +8,11 @@ use std::time::Duration;
 /// One row of the results table: a single scenario at a single concurrency
 /// level, with the sluice-fronted and bare-upstream (baseline) summaries
 /// side by side and the deltas `main.rs` prints as the `+P50`/`+P99`
-/// columns.
+/// columns. The four `*ttfb*` fields (sluice-side and baseline
+/// time-to-first-byte p50/p99) are only `Some` for the streaming scenario;
+/// the chart plots streaming overhead as added TTFB because total stream
+/// duration is dominated by SSE pacing sleeps and its percentile deltas
+/// are pacing jitter, not gateway overhead.
 #[derive(Clone, serde::Serialize)]
 pub struct Cell {
     pub scenario: String,
@@ -18,6 +22,9 @@ pub struct Cell {
     pub added_p50_ms: f64,
     pub added_p99_ms: f64,
     pub ttfb_p50_ms: Option<f64>,
+    pub ttfb_p99_ms: Option<f64>,
+    pub baseline_ttfb_p50_ms: Option<f64>,
+    pub baseline_ttfb_p99_ms: Option<f64>,
     pub sluice_errors: usize,
     pub baseline_errors: usize,
 }
@@ -99,8 +106,8 @@ fn today_utc() -> String {
 
 /// Result of [`run_cell`]: the latency `summary` (built only from
 /// successful, recorded samples), the streaming time-to-first-chunk p50
-/// (when `streaming` was requested), and the count of non-2xx/transport
-/// errors observed during the recorded window.
+/// and p99 (when `streaming` was requested), and the count of
+/// non-2xx/transport errors observed during the recorded window.
 ///
 /// `Clone` so a single shared baseline measurement (see `main.rs`) can be
 /// reused as the baseline for multiple scenario cells at the same
@@ -109,13 +116,15 @@ fn today_utc() -> String {
 pub struct CellRun {
     pub summary: crate::stats::Summary,
     pub ttfb_p50_ms: Option<f64>,
+    pub ttfb_p99_ms: Option<f64>,
     pub errors: usize,
 }
 
 /// Run `concurrency` worker tasks against `url` for `warmup` (discarded)
 /// followed by `window` (recorded), each looping POST -> read full body.
 /// When `streaming` is set, also records time-to-first-chunk per request
-/// and returns its p50 in `CellRun::ttfb_p50_ms`; otherwise `None`.
+/// and returns its p50/p99 in `CellRun::ttfb_p50_ms`/`ttfb_p99_ms`;
+/// otherwise both are `None`.
 ///
 /// Transport errors and non-2xx responses are never timed as latency
 /// samples — that would silently record a fast-failing route as
@@ -203,16 +212,20 @@ pub async fn run_cell(
 
     let mut lat = std::mem::take(&mut *latencies.lock().await);
     let summary = crate::stats::summarize(&mut lat, window);
-    let ttfb_p50_ms = if streaming {
+    let (ttfb_p50_ms, ttfb_p99_ms) = if streaming {
         let mut t = std::mem::take(&mut *ttfbs.lock().await);
         t.sort_unstable();
-        Some(crate::stats::percentile_ms(&t, 0.50))
+        (
+            Some(crate::stats::percentile_ms(&t, 0.50)),
+            Some(crate::stats::percentile_ms(&t, 0.99)),
+        )
     } else {
-        None
+        (None, None)
     };
     CellRun {
         summary,
         ttfb_p50_ms,
+        ttfb_p99_ms,
         errors: errors.load(Ordering::Relaxed),
     }
 }
@@ -243,6 +256,7 @@ mod tests {
             run.summary.p50_ms
         );
         assert!(run.ttfb_p50_ms.is_none());
+        assert!(run.ttfb_p99_ms.is_none());
         assert_eq!(run.errors, 0, "healthy upstream should produce no errors");
     }
 

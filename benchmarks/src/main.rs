@@ -122,13 +122,18 @@ async fn run(args: Args) {
 
         for &concurrency in &plan.concurrency {
             let baseline_run = if streaming {
+                // Measured through the streaming read path (streaming=true)
+                // so the baseline also records TTFB — the metric the chart
+                // plots for this scenario, since total stream duration is
+                // dominated by SSE pacing sleeps and its percentile deltas
+                // are pacing jitter rather than gateway overhead.
                 load::run_cell(
                     baseline_url.clone(),
                     body,
                     concurrency,
                     plan.warmup,
                     plan.window,
-                    false,
+                    true,
                 )
                 .await
             } else {
@@ -162,6 +167,9 @@ async fn run(args: Args) {
                 added_p50_ms: sluice.p50_ms - baseline.p50_ms,
                 added_p99_ms: sluice.p99_ms - baseline.p99_ms,
                 ttfb_p50_ms: sluice_run.ttfb_p50_ms,
+                ttfb_p99_ms: sluice_run.ttfb_p99_ms,
+                baseline_ttfb_p50_ms: baseline_run.ttfb_p50_ms,
+                baseline_ttfb_p99_ms: baseline_run.ttfb_p99_ms,
                 sluice_errors: sluice_run.errors,
                 baseline_errors: baseline_run.errors,
                 sluice,

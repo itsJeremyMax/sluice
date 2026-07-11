@@ -1,5 +1,7 @@
 //! Hand-written SVG chart: added latency per scenario (concurrency 8),
-//! p50 + p99 bars. Two theme variants are rendered; the README embeds
+//! p50 + p99 bars. Buffered scenarios plot added total-request latency;
+//! streaming plots added time-to-first-byte (see `row_values`).
+//! Two theme variants are rendered; the README embeds
 //! them via <picture prefers-color-scheme>, since GitHub does not apply
 //! CSS media queries inside committed <img> SVGs reliably.
 //!
@@ -11,7 +13,31 @@
 //! mode's slot-2 contrast sits in the WARN/relief band, mitigated here by
 //! the always-visible value labels printed beside every bar).
 
-use crate::load::Results;
+use crate::load::{Cell, Results};
+
+/// The row label and (p50, p99) bar values plotted for `cell`.
+///
+/// Buffered scenarios plot added total-request latency. Streaming plots
+/// added time-to-first-byte instead: its total duration is ~48ms
+/// dominated by 21 paced SSE sleeps, so comparing two independent
+/// total-duration percentiles yields multi-ms pacing jitter, not gateway
+/// overhead — added TTFB is the real streaming overhead and is stable.
+/// The row is labeled `streaming (ttfb)` to make the metric explicit.
+fn row_values(cell: &Cell) -> (String, f64, f64) {
+    match (
+        cell.ttfb_p50_ms,
+        cell.ttfb_p99_ms,
+        cell.baseline_ttfb_p50_ms,
+        cell.baseline_ttfb_p99_ms,
+    ) {
+        (Some(p50), Some(p99), Some(base_p50), Some(base_p99)) => (
+            format!("{} (ttfb)", cell.scenario),
+            p50 - base_p50,
+            p99 - base_p99,
+        ),
+        _ => (cell.scenario.clone(), cell.added_p50_ms, cell.added_p99_ms),
+    }
+}
 
 struct Theme {
     text: &'static str,
@@ -38,10 +64,11 @@ const DARK: Theme = Theme {
 
 pub fn render(results: &Results, dark: bool) -> String {
     let t = if dark { &DARK } else { &LIGHT };
-    let cells: Vec<_> = results
+    let cells: Vec<(String, f64, f64)> = results
         .cells
         .iter()
         .filter(|c| c.concurrency == 8)
+        .map(row_values)
         .collect();
 
     const W: f64 = 720.0;
@@ -56,7 +83,7 @@ pub fn render(results: &Results, dark: bool) -> String {
     // Axis max: largest value rounded up to a clean 1-2-5 step, >= 4 ticks.
     let max_val = cells
         .iter()
-        .flat_map(|c| [c.added_p50_ms, c.added_p99_ms])
+        .flat_map(|&(_, p50, p99)| [p50, p99])
         .fold(0.1_f64, f64::max);
     let step = [0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0]
         .into_iter()
@@ -103,19 +130,17 @@ pub fn render(results: &Results, dark: bool) -> String {
         tick += step;
     }
     // One row per scenario: label + p50/p99 bars with value annotations.
-    for (i, c) in cells.iter().enumerate() {
+    // Streaming's row plots added TTFB and is labeled accordingly (see
+    // `row_values`).
+    for (i, (label, p50, p99)) in cells.iter().enumerate() {
         let top = HEADER + i as f64 * ROW_H + 8.0;
         s.push_str(&format!(
-            "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{}\">{}</text>\n",
+            "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"end\" fill=\"{}\">{label}</text>\n",
             GUTTER - 10.0,
             top + BAR_H + 2.0,
             t.text,
-            c.scenario
         ));
-        for (j, (v, color)) in [(c.added_p50_ms, t.p50), (c.added_p99_ms, t.p99)]
-            .iter()
-            .enumerate()
-        {
+        for (j, (v, color)) in [(*p50, t.p50), (*p99, t.p99)].iter().enumerate() {
             let y = top + j as f64 * (BAR_H + 4.0);
             let wpx = (x(*v) - GUTTER).max(1.0);
             s.push_str(&format!(
@@ -167,17 +192,39 @@ mod tests {
                 arch: "aarch64".into(),
                 cpus: 8,
             },
-            cells: vec![Cell {
-                scenario: "passthrough".into(),
-                concurrency: 8,
-                sluice: s(3.0),
-                baseline: s(2.5),
-                added_p50_ms: 0.5,
-                added_p99_ms: 1.5,
-                ttfb_p50_ms: None,
-                sluice_errors: 0,
-                baseline_errors: 0,
-            }],
+            cells: vec![
+                Cell {
+                    scenario: "passthrough".into(),
+                    concurrency: 8,
+                    sluice: s(3.0),
+                    baseline: s(2.5),
+                    added_p50_ms: 0.5,
+                    added_p99_ms: 1.5,
+                    ttfb_p50_ms: None,
+                    ttfb_p99_ms: None,
+                    baseline_ttfb_p50_ms: None,
+                    baseline_ttfb_p99_ms: None,
+                    sluice_errors: 0,
+                    baseline_errors: 0,
+                },
+                Cell {
+                    scenario: "streaming".into(),
+                    concurrency: 8,
+                    sluice: s(48.0),
+                    baseline: s(47.0),
+                    // Deliberately implausible total-duration deltas: if
+                    // these ever appear in the SVG, the streaming row is
+                    // wrongly plotting total duration instead of TTFB.
+                    added_p50_ms: 77.77,
+                    added_p99_ms: 88.88,
+                    ttfb_p50_ms: Some(3.5),
+                    ttfb_p99_ms: Some(5.25),
+                    baseline_ttfb_p50_ms: Some(3.25),
+                    baseline_ttfb_p99_ms: Some(4.0),
+                    sluice_errors: 0,
+                    baseline_errors: 0,
+                },
+            ],
         }
     }
 
@@ -188,6 +235,19 @@ mod tests {
         assert!(svg.ends_with("</svg>\n"));
         assert!(svg.contains("passthrough"));
         assert!(svg.contains("0.5")); // the added-p50 value appears
+    }
+
+    #[test]
+    fn streaming_row_plots_added_ttfb_not_total_duration() {
+        let svg = render(&fake_results(), false);
+        // Labeled to make the different metric explicit.
+        assert!(svg.contains("streaming (ttfb)"));
+        // Added TTFB deltas: 3.5 - 3.25 and 5.25 - 4.0.
+        assert!(svg.contains(">0.25</text>"), "added ttfb p50 missing");
+        assert!(svg.contains(">1.25</text>"), "added ttfb p99 missing");
+        // The total-duration deltas must NOT be plotted for streaming.
+        assert!(!svg.contains("77.77"));
+        assert!(!svg.contains("88.88"));
     }
 
     #[test]
