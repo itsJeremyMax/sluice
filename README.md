@@ -105,6 +105,8 @@ curl -fsSL https://raw.githubusercontent.com/itsJeremyMax/sluice/main/install.sh
 
 This fetches the latest release, verifies its SHA-256 checksum, and installs the `sluice` binary to `/usr/local/bin` (or `~/.local/bin` when that is not writable). Re-run the same command any time to update; it is a no-op when you already have the current version.
 
+Already installed? `sluice update --check` tells you if a newer release exists; `sluice update` installs it (checksum-verified).
+
 Pin a version, pick a directory, or remove:
 
 ```bash

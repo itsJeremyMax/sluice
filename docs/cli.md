@@ -148,3 +148,31 @@ A chain token is a self-contained, HMAC-signed value, so verifying one needs onl
 ```bash
 sluice token verify --secret "$LOOPBACK_SECRET" eyJjaWQi...
 ```
+
+## `update`
+
+Check for a newer sluice release, or install it.
+
+```
+sluice update [--check]
+```
+
+`sluice update --check` is read-only: it prints the current and latest
+versions and exits `0` when up to date (or ahead, e.g. a dev build), `10`
+when a newer release exists, and `1` on error. The distinct exit code
+makes scripted checks easy: `sluice update --check || notify`.
+
+`sluice update` (no flag) downloads the release binary for this platform,
+verifies it against the `.sha256` checksum published with the release
+(a missing or mismatched checksum aborts the update), and atomically
+replaces the running binary. If the install location isn't writable,
+re-run with elevated permissions or re-install via `install.sh`.
+
+The latest version is resolved from GitHub's `releases/latest` redirect —
+no API token needed. There is no automatic background checking: sluice
+never checks for updates unless you run this command.
+
+```bash
+sluice update --check
+sluice update
+```
