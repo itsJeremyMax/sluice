@@ -84,7 +84,7 @@ async fn run(args: Args) {
         let streaming = scenario.is_streaming();
 
         for &concurrency in &plan.concurrency {
-            let (baseline, _) = load::run_cell(
+            let baseline_run = load::run_cell(
                 baseline_url.clone(),
                 body,
                 concurrency,
@@ -93,7 +93,7 @@ async fn run(args: Args) {
                 false,
             )
             .await;
-            let (sluice, ttfb_p50_ms) = load::run_cell(
+            let sluice_run = load::run_cell(
                 sluice_url.clone(),
                 body,
                 concurrency,
@@ -103,12 +103,23 @@ async fn run(args: Args) {
             )
             .await;
 
+            let name = scenario.name();
+            if sluice_run.summary.count == 0 || baseline_run.summary.count == 0 {
+                panic!(
+                    "benchmark cell produced zero samples (scenario {name}, concurrency {concurrency}): the target is not serving; results would be meaningless"
+                );
+            }
+
+            let sluice = sluice_run.summary;
+            let baseline = baseline_run.summary;
             cells.push(Cell {
-                scenario: scenario.name().to_string(),
+                scenario: name.to_string(),
                 concurrency,
                 added_p50_ms: sluice.p50_ms - baseline.p50_ms,
                 added_p99_ms: sluice.p99_ms - baseline.p99_ms,
-                ttfb_p50_ms,
+                ttfb_p50_ms: sluice_run.ttfb_p50_ms,
+                sluice_errors: sluice_run.errors,
+                baseline_errors: baseline_run.errors,
                 sluice,
                 baseline,
             });
@@ -142,6 +153,18 @@ fn render_table(cells: &[Cell]) -> String {
             c.added_p50_ms,
             c.added_p99_ms,
         ));
+        if c.sluice_errors > 0 {
+            out.push_str(&format!(
+                "  warning: {} error responses excluded from sluice samples\n",
+                c.sluice_errors
+            ));
+        }
+        if c.baseline_errors > 0 {
+            out.push_str(&format!(
+                "  warning: {} error responses excluded from baseline samples\n",
+                c.baseline_errors
+            ));
+        }
     }
     out
 }
