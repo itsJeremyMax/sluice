@@ -101,6 +101,11 @@ fn today_utc() -> String {
 /// successful, recorded samples), the streaming time-to-first-chunk p50
 /// (when `streaming` was requested), and the count of non-2xx/transport
 /// errors observed during the recorded window.
+///
+/// `Clone` so a single shared baseline measurement (see `main.rs`) can be
+/// reused as the baseline for multiple scenario cells at the same
+/// concurrency level without re-running the load driver.
+#[derive(Clone)]
 pub struct CellRun {
     pub summary: crate::stats::Summary,
     pub ttfb_p50_ms: Option<f64>,

@@ -23,6 +23,16 @@ the full matrix) and the charts above are re-rendered on every run. The
 committed numbers come from the machine and version labeled inside the
 chart and JSON — treat cross-machine comparisons as directional only.
 
+The four buffered scenarios (passthrough, translation, script-step,
+wasm-step) all hit the same simulated JSON upstream with functionally
+identical requests, so they share a single direct-to-upstream baseline
+measurement per concurrency level rather than each measuring its own.
+Streaming hits a different endpoint through a different read path, so it
+keeps its own dedicated baseline. Added-latency values, especially p99,
+still carry roughly ±1ms of tail noise on a laptop-class machine — a tiny
+or slightly negative added p99 should be read as "no measurable overhead,"
+not as sluice being faster than the bare upstream.
+
 ## Scenarios
 
 - **passthrough** — plain proxy route, no steps

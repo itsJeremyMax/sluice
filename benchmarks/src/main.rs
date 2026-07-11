@@ -70,6 +70,43 @@ async fn run(args: Args) {
     let plan = Plan::for_args(&args);
     let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
 
+    // The four buffered scenarios (passthrough, translation, script-step,
+    // wasm-step) all hit the same simulated JSON upstream
+    // (`Sim::default_bench`'s `/v1/messages` handler) with functionally
+    // identical requests, so their direct-to-upstream latency is the same
+    // distribution — only sampling noise differs. Measuring it separately
+    // per scenario let independent tail noise land in one scenario's
+    // baseline (e.g. a slow p99 sample) and not another's, which can turn
+    // "no overhead" into a nonsensical *negative* added-latency cell on the
+    // public chart. So it's measured exactly once per concurrency level,
+    // on a dedicated upstream instance, before the scenario loop, and that
+    // one `CellRun` is reused as the baseline for all four buffered
+    // scenarios at that concurrency. Streaming hits a different endpoint
+    // through a different (streaming) read path, so it keeps its own
+    // dedicated baseline inside the loop below.
+    let shared_baseline_upstream = upstream::start(Sim::default_bench());
+    let shared_baseline_url = format!("http://{shared_baseline_upstream}/v1/messages");
+    let shared_baseline_body = Scenario::Passthrough.request_body();
+    let mut shared_baselines: std::collections::HashMap<usize, load::CellRun> =
+        std::collections::HashMap::new();
+    for &concurrency in &plan.concurrency {
+        let baseline_run = load::run_cell(
+            shared_baseline_url.clone(),
+            shared_baseline_body,
+            concurrency,
+            plan.warmup,
+            plan.window,
+            false,
+        )
+        .await;
+        if baseline_run.summary.count == 0 {
+            panic!(
+                "benchmark cell produced zero samples (shared baseline, concurrency {concurrency}): the target is not serving; results would be meaningless"
+            );
+        }
+        shared_baselines.insert(concurrency, baseline_run);
+    }
+
     let mut cells = Vec::new();
     for scenario in Scenario::all() {
         if !scenario.available() {
@@ -84,15 +121,22 @@ async fn run(args: Args) {
         let streaming = scenario.is_streaming();
 
         for &concurrency in &plan.concurrency {
-            let baseline_run = load::run_cell(
-                baseline_url.clone(),
-                body,
-                concurrency,
-                plan.warmup,
-                plan.window,
-                false,
-            )
-            .await;
+            let baseline_run = if streaming {
+                load::run_cell(
+                    baseline_url.clone(),
+                    body,
+                    concurrency,
+                    plan.warmup,
+                    plan.window,
+                    false,
+                )
+                .await
+            } else {
+                shared_baselines
+                    .get(&concurrency)
+                    .cloned()
+                    .expect("shared baseline was measured for every concurrency level up front")
+            };
             let sluice_run = load::run_cell(
                 sluice_url.clone(),
                 body,
