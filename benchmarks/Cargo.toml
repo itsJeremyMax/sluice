@@ -1,6 +1,6 @@
 [package]
 name = "sluice-bench"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
 publish = false
 description = "End-to-end overhead benchmarks for sluice (not published)."
