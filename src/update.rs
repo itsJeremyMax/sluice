@@ -1,5 +1,5 @@
-//! `sluice update` — self-update against GitHub releases (design doc:
-//! docs/superpowers/specs/2026-07-10-self-update-design.md). Resolution
+//! `sluice update` — self-update against GitHub releases (see
+//! docs/cli.md's update section). Resolution
 //! follows the `releases/latest` redirect (no GitHub API); downloads are
 //! the bare-binary assets and are ALWAYS sha256-verified.
 

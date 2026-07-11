@@ -79,7 +79,7 @@ pub enum Command {
         check: bool,
         /// Override the GitHub releases base URL. Hidden — test-only, so
         /// integration tests can point at a mock server (see
-        /// `Update::network_url` for the same pattern on `models`).
+        /// `ModelsAction::Update::network_url` for the same pattern on `models`).
         #[arg(long, hide = true)]
         releases_url: Option<String>,
     },

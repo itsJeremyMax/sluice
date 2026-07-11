@@ -25,7 +25,7 @@ pub fn percentile_ms(sorted: &[Duration], q: f64) -> f64 {
 
 /// Sort `latencies` in place and summarize them against the measure
 /// `window` that produced them (rps = count / window seconds).
-pub fn summarize(latencies: &mut Vec<Duration>, window: Duration) -> Summary {
+pub fn summarize(latencies: &mut [Duration], window: Duration) -> Summary {
     latencies.sort_unstable();
     let count = latencies.len();
     let secs = window.as_secs_f64();

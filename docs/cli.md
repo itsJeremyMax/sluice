@@ -168,8 +168,8 @@ verifies it against the `.sha256` checksum published with the release
 replaces the running binary. If the install location isn't writable,
 re-run with elevated permissions or re-install via `install.sh`.
 
-The latest version is resolved from GitHub's `releases/latest` redirect —
-no API token needed. There is no automatic background checking: sluice
+The latest version is resolved from GitHub's `releases/latest` redirect,
+so no API token is needed. There is no automatic background checking: sluice
 never checks for updates unless you run this command.
 
 ```bash

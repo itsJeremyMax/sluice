@@ -1,5 +1,5 @@
-//! sluice-bench: end-to-end overhead benchmarks. Spec:
-//! docs/superpowers/specs/2026-07-10-benchmarks-design.md.
+//! sluice-bench: end-to-end overhead benchmarks. See
+//! benchmarks/README.md for details.
 //! Run with `cargo run --release -p sluice-bench` (add `--quick` for a
 //! fast smoke run). Everything is offline: a simulated LLM upstream is
 //! started in-process and sluice is served in-process around it.
