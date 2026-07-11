@@ -2174,6 +2174,7 @@ dependencies = [
 name = "sluice-bench"
 version = "0.0.0"
 dependencies = [
+ "bytes",
  "futures-util",
  "http-body-util",
  "hyper",

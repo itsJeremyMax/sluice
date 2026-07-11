@@ -7,6 +7,7 @@ description = "End-to-end overhead benchmarks for sluice (not published)."
 
 [dependencies]
 sluice = { path = ".." }
+bytes = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "io-util", "sync"] }
 hyper = { version = "1", features = ["server", "http1"] }
 hyper-util = { version = "0.1", features = ["tokio", "server", "server-auto", "http1"] }
