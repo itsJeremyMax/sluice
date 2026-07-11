@@ -131,7 +131,14 @@ async fn run(args: Args) {
     let results = Results::new(cells);
     write_results(&results);
 
-    // chart rendering added in the next task
+    let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
+    std::fs::write(assets_dir.join("chart.svg"), chart::render(&results, false))
+        .expect("write chart");
+    std::fs::write(
+        assets_dir.join("chart-dark.svg"),
+        chart::render(&results, true),
+    )
+    .expect("write dark chart");
 }
 
 /// Render `cells` as a fixed-width text table, mirroring the root crate's
