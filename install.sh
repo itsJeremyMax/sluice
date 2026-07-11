@@ -209,7 +209,11 @@ do_install() {
   need uname
   need tar
 
-  local target tag numver dest_dir dest tmp asset url current
+  # tmp is deliberately NOT local: the EXIT trap below fires after this
+  # function returns, so a local would be out of scope there (an unbound-
+  # variable error under set -u, and a leaked temp dir).
+  local target tag numver dest_dir dest asset url current
+  tmp=""
 
   target="$(detect_target)"
   info "platform: $target"

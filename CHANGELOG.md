@@ -31,5 +31,3 @@
 ### Miscellaneous Chores
 
 * release 0.1.0 ([5ef1224](https://github.com/itsJeremyMax/sluice/commit/5ef12245af1f6170afa7f654670ac9fcc10c93c9))
-
-## Changelog

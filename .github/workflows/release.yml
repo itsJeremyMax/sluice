@@ -91,10 +91,14 @@ jobs:
           gh release upload "${{ needs.release-please.outputs.tag_name }}" \
             sluice-${{ needs.release-please.outputs.tag_name }}-${{ matrix.target }}* --clobber
 
-  # The release is created as a DRAFT (release-please-config.json sets
-  # "draft": true) so it is invisible to `releases/latest` — and therefore to
-  # `sluice update` and install.sh — until every matrix leg above has built
-  # and uploaded its assets. If any build fails, the draft stays unpublished.
+  # The release is created as a PRERELEASE (release-please-config.json sets
+  # "prerelease": true), which `releases/latest` excludes — so `sluice
+  # update` and install.sh cannot see it until every matrix leg above has
+  # built and uploaded its assets. A prerelease (unlike a draft) creates its
+  # git tag immediately, so release-please never re-proposes the same
+  # version in a ghost PR while builds are still running. If any build
+  # fails, the release stays a prerelease and `releases/latest` keeps
+  # pointing at the previous good release.
   publish-release:
     needs: [release-please, build-binaries]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
@@ -104,4 +108,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
-        run: gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --draft=false
+        run: gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --prerelease=false --latest
