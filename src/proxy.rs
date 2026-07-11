@@ -2922,9 +2922,18 @@ mod worker_lifecycle_tests {
 
     /// H2: a worker that times out is EVICTED from the cache (its child was
     /// already killed by `ScriptWorker::call`), so the NEXT request spawns a
-    /// fresh worker rather than hitting the dead corpse. The worker sleeps far
-    /// past the step timeout on its FIRST call (gated by a marker file), then
-    /// behaves normally once respawned.
+    /// fresh worker rather than hitting the dead corpse.
+    ///
+    /// The sleep-vs-respond switch is a marker file the TEST owns: it exists
+    /// for the first call (worker sleeps past the timeout) and is deleted
+    /// before the second (fresh worker responds immediately). The inversion
+    /// matters for robustness under load: if the worker itself wrote the
+    /// marker while handling call one (the previous design), a first worker
+    /// killed by the timeout BEFORE reaching that write — python startup can
+    /// exceed the step timeout on a loaded machine — left the respawned
+    /// worker on the sleep branch, and call two timed out spuriously. Call
+    /// two also gets a far larger timeout: it only proves a fresh spawn
+    /// works, so it must tolerate slow process startup rather than race it.
     #[tokio::test]
     async fn timed_out_worker_is_evicted_and_next_call_spawns_fresh() {
         if !have_python3() {
@@ -2941,9 +2950,9 @@ mod worker_lifecycle_tests {
                 .unwrap()
                 .as_nanos()
         ));
-        let _ = std::fs::remove_file(&marker);
+        std::fs::write(&marker, b"").unwrap();
         let worker = write_worker(
-            "sleep_first",
+            "sleep_while_marked",
             r#"import sys, struct, json, os, time
 marker = sys.argv[1]
 while True:
@@ -2952,8 +2961,7 @@ while True:
         break
     n = struct.unpack('<I', hdr)[0]
     _ = sys.stdin.buffer.read(n)
-    if not os.path.exists(marker):
-        open(marker, 'w').close()
+    if os.path.exists(marker):
         time.sleep(30)
     resp = json.dumps({"action": "continue", "ops": [
         {"op": "set_header", "name": "x-alive", "value": "yes"}
@@ -2965,14 +2973,12 @@ while True:
         );
 
         let state = minimal_state();
-        let step = worker_step(
-            vec![
-                "python3".into(),
-                worker.display().to_string(),
-                marker.display().to_string(),
-            ],
-            500,
-        );
+        let cmd = vec![
+            "python3".to_string(),
+            worker.display().to_string(),
+            marker.display().to_string(),
+        ];
+        let step = worker_step(cmd.clone(), 500);
         let key = worker_cache_key(&step.cmd);
         let env = req_envelope();
 
@@ -2986,6 +2992,10 @@ while True:
             "H2: a timed-out (killed) worker must be evicted so the next request spawns fresh"
         );
 
+        std::fs::remove_file(&marker).unwrap();
+        // Same cmd (same cache key), generous timeout: call two verifies the
+        // respawn path, not spawn latency.
+        let step = worker_step(cmd, 5_000);
         let second = run_cached_worker_step(&state, &step, &env).await;
         let ok = matches!(&second, Ok(Directive::Continue { ops })
             if ops.iter().any(|op| matches!(op, crate::directive::Op::SetHeader { name, value }
