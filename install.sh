@@ -236,7 +236,7 @@ do_install() {
     [ -n "$current" ] && info "updating $BINARY $current -> $numver"
   fi
 
-  asset="sluice-${target}.tar.gz"
+  asset="sluice-${tag}-${target}.tar.gz"
   url="https://github.com/${REPO}/releases/download/${tag}/${asset}"
 
   tmp="$(mktemp -d)"
