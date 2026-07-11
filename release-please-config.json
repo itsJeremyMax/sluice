@@ -4,7 +4,8 @@
   "packages": {
     ".": {
       "release-type": "rust",
-      "package-name": "sluice"
+      "package-name": "sluice",
+      "include-component-in-tag": false
     }
   }
 }
