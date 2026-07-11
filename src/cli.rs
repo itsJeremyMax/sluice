@@ -68,6 +68,21 @@ pub enum Command {
         #[command(subcommand)]
         action: TokenAction,
     },
+    /// Check for a newer sluice release, or install it. `--check` never
+    /// modifies anything (exit 0 = up to date, 10 = update available);
+    /// without it, a newer release is downloaded, sha256-verified, and
+    /// atomically swapped in place of this binary.
+    Update {
+        /// Only report whether a newer release exists; never download or
+        /// modify the binary.
+        #[arg(long)]
+        check: bool,
+        /// Override the GitHub releases base URL. Hidden — test-only, so
+        /// integration tests can point at a mock server (see
+        /// `Update::network_url` for the same pattern on `models`).
+        #[arg(long, hide = true)]
+        releases_url: Option<String>,
+    },
 }
 
 /// `sluice token` subcommands. Entirely offline (no server, no network) — a
@@ -608,5 +623,42 @@ mod tests {
             clap::error::ErrorKind::MissingRequiredArgument,
             "{err}"
         );
+    }
+
+    #[test]
+    fn parses_update_default() {
+        let cli = Cli::try_parse_from(["sluice", "update"]).unwrap();
+        match cli.command {
+            Command::Update {
+                check,
+                releases_url,
+            } => {
+                assert!(!check);
+                assert_eq!(releases_url, None);
+            }
+            other => panic!("expected Command::Update, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_update_check_with_hidden_releases_url() {
+        let cli = Cli::try_parse_from([
+            "sluice",
+            "update",
+            "--check",
+            "--releases-url",
+            "http://127.0.0.1:9/releases",
+        ])
+        .unwrap();
+        match cli.command {
+            Command::Update {
+                check,
+                releases_url,
+            } => {
+                assert!(check);
+                assert_eq!(releases_url.as_deref(), Some("http://127.0.0.1:9/releases"));
+            }
+            other => panic!("expected Command::Update, got {other:?}"),
+        }
     }
 }

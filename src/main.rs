@@ -18,7 +18,7 @@ use sluice::router::upstream_url_for;
 use sluice::step::script::ScriptOneshot;
 use sluice::step::url::UrlTransform;
 use sluice::step::wasm::WasmStep;
-use sluice::{config, server};
+use sluice::{config, server, update};
 
 fn load(config: &Path, config_dir: &Option<PathBuf>) -> Result<Config, ConfigError> {
     match config_dir {
@@ -545,6 +545,15 @@ fn main() -> std::process::ExitCode {
         Command::Token { action } => match action {
             TokenAction::Verify { secret, token } => run_token_verify(&secret, &token),
         },
+        Command::Update {
+            check,
+            releases_url,
+        } => update::run(
+            check,
+            releases_url
+                .as_deref()
+                .unwrap_or(update::DEFAULT_RELEASES_URL),
+        ),
         Command::Test {
             route,
             config,

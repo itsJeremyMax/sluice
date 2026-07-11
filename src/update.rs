@@ -210,6 +210,83 @@ pub fn replace_current_exe(bytes: &[u8]) -> Result<(), UpdateError> {
     result
 }
 
+use std::process::ExitCode;
+
+/// Run `sluice update [--check]`. Synchronous wrapper: spins up a
+/// short-lived current-thread runtime for the network calls, mirroring
+/// `main.rs`'s `resolve_models_source` pattern.
+pub fn run(check_only: bool, releases_url: &str) -> ExitCode {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("build tokio runtime");
+    rt.block_on(run_async(check_only, releases_url))
+}
+
+async fn run_async(check_only: bool, releases_url: &str) -> ExitCode {
+    let current_str = env!("CARGO_PKG_VERSION");
+    let current =
+        parse_version(current_str).expect("CARGO_PKG_VERSION is always a valid x.y.z version");
+
+    let tag = match resolve_latest(&no_redirect_client(), releases_url).await {
+        Ok(tag) => tag,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let latest = match parse_version(&tag) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    println!("current: {current_str}");
+    println!("latest:  {}", tag.trim_start_matches('v'));
+
+    if current == latest {
+        println!("already up to date");
+        return ExitCode::SUCCESS;
+    }
+    if current > latest {
+        println!("ahead of latest release (dev build?)");
+        return ExitCode::SUCCESS;
+    }
+    if check_only {
+        println!("update available: run `sluice update`");
+        return ExitCode::from(EXIT_UPDATE_AVAILABLE);
+    }
+
+    let target = match target_triple() {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    println!("downloading {} ...", asset_name(&tag, target));
+    let bytes = match download_verified(&reqwest::Client::new(), releases_url, &tag, target).await {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if let Err(e) = replace_current_exe(&bytes) {
+        // Most common cause: binary lives somewhere not writable by this
+        // user (e.g. /usr/local/bin without root).
+        eprintln!("{e}");
+        eprintln!(
+            "hint: re-run with elevated permissions (e.g. sudo), or re-install via install.sh"
+        );
+        return ExitCode::FAILURE;
+    }
+    println!("updated to {tag}");
+    ExitCode::SUCCESS
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
