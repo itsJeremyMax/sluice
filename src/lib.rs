@@ -15,3 +15,7 @@ pub mod server;
 pub mod sse;
 pub mod step;
 pub mod update;
+
+/// Crate version, re-exported so out-of-crate tooling (sluice-bench) can
+/// label results with the sluice version it measured.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
