@@ -38,7 +38,7 @@ tracing-subscriber = { version = "0.3", features = ["json", "env-filter", "fmt"]
 metrics = "0.24"
 metrics-exporter-prometheus = { version = "0.16", default-features = false }
 uuid = { version = "1", features = ["v4"] }
-notify = "6"
+notify = "8"
 include_dir = "0.7"
 wasmtime = "46.0.1"
 subtle = "2"
