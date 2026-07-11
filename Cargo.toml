@@ -27,7 +27,7 @@ clap = { version = "4", features = ["derive"] }
 bytes = "1"
 arc-swap = "1"
 base64 = "0.22"
-hmac = "0.12"
+hmac = "0.13"
 sha2 = "0.10"
 dashmap = "6"
 thiserror = "2"
