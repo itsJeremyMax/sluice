@@ -75,6 +75,141 @@ pub fn asset_name(tag: &str, target: &str) -> String {
     format!("sluice-{tag}-{target}{exe}")
 }
 
+use sha2::{Digest, Sha256};
+
+/// A client that does NOT follow redirects — `resolve_latest` needs the
+/// `Location` header itself, not the page it points at.
+pub fn no_redirect_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .expect("build reqwest client")
+}
+
+/// Resolve the latest release tag by requesting `<releases_url>/latest` and
+/// reading the tag off the redirect `Location` (the same trick
+/// `install.sh`'s `resolve_latest` uses — no GitHub API, no token). The
+/// passed client must have redirects disabled (`no_redirect_client`).
+pub async fn resolve_latest(
+    client: &reqwest::Client,
+    releases_url: &str,
+) -> Result<String, UpdateError> {
+    let url = format!("{releases_url}/latest");
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| UpdateError::ResolveLatest(e.to_string()))?;
+    let location = resp
+        .headers()
+        .get(reqwest::header::LOCATION)
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| {
+            UpdateError::ResolveLatest(format!(
+                "expected a redirect from {url}, got status {}",
+                resp.status()
+            ))
+        })?;
+    let tag = location
+        .rsplit("/tag/")
+        .next()
+        .filter(|t| !t.is_empty() && !t.contains('/'))
+        .ok_or_else(|| {
+            UpdateError::ResolveLatest(format!("no /tag/ in redirect location '{location}'"))
+        })?;
+    Ok(tag.to_string())
+}
+
+/// Download the bare-binary asset for `tag`/`target` and its `.sha256`,
+/// verify the digest, and return the binary bytes. Strict: a missing
+/// checksum file or a mismatch is an error — never returns unverified
+/// bytes. The passed client must FOLLOW redirects (GitHub serves release
+/// assets via a redirect to a CDN host).
+pub async fn download_verified(
+    client: &reqwest::Client,
+    releases_url: &str,
+    tag: &str,
+    target: &str,
+) -> Result<Vec<u8>, UpdateError> {
+    let asset = asset_name(tag, target);
+    let asset_url = format!("{releases_url}/download/{tag}/{asset}");
+
+    let sum_resp = client
+        .get(format!("{asset_url}.sha256"))
+        .send()
+        .await
+        .map_err(|e| UpdateError::Download(e.to_string()))?;
+    if !sum_resp.status().is_success() {
+        return Err(UpdateError::MissingChecksum(asset));
+    }
+    let sum_text = sum_resp
+        .text()
+        .await
+        .map_err(|e| UpdateError::Download(e.to_string()))?;
+    // `sha256sum` format: "<hex>  <filename>" — first token is the digest.
+    let expected = sum_text
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .to_lowercase();
+    if expected.len() != 64 {
+        return Err(UpdateError::MissingChecksum(asset));
+    }
+
+    let bin_resp = client
+        .get(&asset_url)
+        .send()
+        .await
+        .map_err(|e| UpdateError::Download(e.to_string()))?;
+    if !bin_resp.status().is_success() {
+        return Err(UpdateError::Download(format!(
+            "GET {asset_url} returned {}",
+            bin_resp.status()
+        )));
+    }
+    let bytes = bin_resp
+        .bytes()
+        .await
+        .map_err(|e| UpdateError::Download(e.to_string()))?
+        .to_vec();
+
+    let mut actual = String::new();
+    for b in Sha256::digest(&bytes) {
+        actual.push_str(&format!("{b:02x}"));
+    }
+    if actual != expected {
+        return Err(UpdateError::ChecksumMismatch {
+            asset,
+            expected,
+            actual,
+        });
+    }
+    Ok(bytes)
+}
+
+/// Atomically replace the currently running executable with `bytes`: write
+/// to a temp file next to the current exe (same filesystem, so the final
+/// swap is a rename), mark executable on unix, then hand off to
+/// `self_replace` (which owns the platform quirks, notably Windows'
+/// can't-overwrite-a-running-exe dance).
+pub fn replace_current_exe(bytes: &[u8]) -> Result<(), UpdateError> {
+    let err = |e: std::io::Error| UpdateError::Replace(e.to_string());
+    let exe = std::env::current_exe().map_err(err)?;
+    let dir = exe
+        .parent()
+        .ok_or_else(|| UpdateError::Replace(format!("{} has no parent dir", exe.display())))?;
+    let tmp = dir.join(format!(".sluice-update-{}", std::process::id()));
+    std::fs::write(&tmp, bytes).map_err(err)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755)).map_err(err)?;
+    }
+    let result = self_replace::self_replace(&tmp).map_err(err);
+    let _ = std::fs::remove_file(&tmp);
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -115,5 +250,97 @@ mod tests {
         // This test runs on a supported dev/CI platform by definition.
         let t = target_triple().unwrap();
         assert!(t.contains(std::env::consts::ARCH));
+    }
+
+    use sha2::{Digest, Sha256};
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    fn hex_digest(bytes: &[u8]) -> String {
+        let mut out = String::new();
+        for b in Sha256::digest(bytes) {
+            out.push_str(&format!("{b:02x}"));
+        }
+        out
+    }
+
+    #[tokio::test]
+    async fn resolve_latest_reads_tag_from_redirect_location() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/latest"))
+            .respond_with(
+                ResponseTemplate::new(302)
+                    .insert_header("location", format!("{}/tag/v9.9.9", server.uri()).as_str()),
+            )
+            .mount(&server)
+            .await;
+        let client = no_redirect_client();
+        assert_eq!(
+            resolve_latest(&client, &server.uri()).await.unwrap(),
+            "v9.9.9"
+        );
+    }
+
+    #[tokio::test]
+    async fn download_verified_accepts_matching_checksum() {
+        let server = MockServer::start().await;
+        let target = "x86_64-apple-darwin";
+        let asset = asset_name("v9.9.9", target);
+        let body = b"fake-new-binary".to_vec();
+        Mock::given(method("GET"))
+            .and(path(format!("/download/v9.9.9/{asset}.sha256")))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string(format!("{}  {asset}\n", hex_digest(&body))),
+            )
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path(format!("/download/v9.9.9/{asset}")))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(body.clone()))
+            .mount(&server)
+            .await;
+        let client = reqwest::Client::new();
+        let got = download_verified(&client, &server.uri(), "v9.9.9", target)
+            .await
+            .unwrap();
+        assert_eq!(got, body);
+    }
+
+    #[tokio::test]
+    async fn download_verified_rejects_checksum_mismatch() {
+        let server = MockServer::start().await;
+        let target = "x86_64-apple-darwin";
+        let asset = asset_name("v9.9.9", target);
+        Mock::given(method("GET"))
+            .and(path(format!("/download/v9.9.9/{asset}.sha256")))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string(format!("{}  {asset}\n", hex_digest(b"different-bytes"))),
+            )
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path(format!("/download/v9.9.9/{asset}")))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"fake-new-binary".to_vec()))
+            .mount(&server)
+            .await;
+        let client = reqwest::Client::new();
+        let err = download_verified(&client, &server.uri(), "v9.9.9", target)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, UpdateError::ChecksumMismatch { .. }));
+    }
+
+    #[tokio::test]
+    async fn download_verified_refuses_missing_checksum() {
+        let server = MockServer::start().await;
+        // No mocks mounted: the .sha256 GET 404s.
+        let client = reqwest::Client::new();
+        let err = download_verified(&client, &server.uri(), "v9.9.9", "x86_64-apple-darwin")
+            .await
+            .unwrap_err();
+        assert!(matches!(err, UpdateError::MissingChecksum(_)));
     }
 }
